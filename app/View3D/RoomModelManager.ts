@@ -252,7 +252,7 @@ export default class RoomModelManager {
 		this.abstractPlane.visible = false;
 		this.abstractPlane.position.y = -0.008;
 
-		scene.add(this.abstractPlane);
+		//scene.add(this.abstractPlane);
 
 		/*const pathToModel = "/models/model_name.dae";
 

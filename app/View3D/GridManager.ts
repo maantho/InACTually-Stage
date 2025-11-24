@@ -13,6 +13,7 @@
 
 	contributors:
 	Fabian Töpfer - baniaf@uber.space
+	Anton Hörig - dev@antonhoerig.de
 */
 
 import * as THREE from "three";
@@ -36,12 +37,15 @@ export default class GridManager {
 
 	setup(scene: THREE.Scene) {
 
-		this.m_gridLinear = new THREE.GridHelper(10, 40, 0xffffff, 0xeeeeee);
-		this.m_gridLinear.position.set(5, 0, 5);
+		this.m_gridLinear = new THREE.GridHelper(20, 100, 0xAFC8FF , 0xAFC8FF );
+		this.m_gridLinear.position.set(0, 0, 0);
 		this.m_gridLinear.visible = false;
 
+		this.m_gridLinear.material.transparent = true;
+		this.m_gridLinear.material.opacity = 0.3;
+
 		this.m_gridRadial = new THREE.PolarGridHelper(5, 16, 8, 64, 0xffffff, 0xeeeeee);
-		this.m_gridRadial.position.set(5, 0, 5);
+		this.m_gridRadial.position.set(0, 0, 0);
 		this.m_gridRadial.visible = false;
 
 		scene.add(this.m_gridLinear);

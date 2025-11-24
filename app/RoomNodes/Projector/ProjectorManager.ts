@@ -12,6 +12,7 @@
 
 	contributors:
 	Lars Engeln - mail@lars-engeln.de
+	Anton Hörig - dev@antonhoerig.de
 */
 
 import loadModel from "~/app/Utils/ModelLoader";

@@ -14,6 +14,7 @@
 	contributors:
 	Fabian Töpfer - baniaf@uber.space
 	Lars Engeln - mail@lars-engeln.de
+	Anton Hörig - dev@antonhoerig.de
 */
 
 import type RoomNodeBase from "./RoomNodes/RoomNodeBase";

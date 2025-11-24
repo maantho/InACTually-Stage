@@ -14,6 +14,7 @@
 	contributors:
 	Fabian Töpfer - baniaf@uber.space
 	Lars Engeln - mail@lars-engeln.de
+    Anton Hörig - dev@antonhoerig.de
 -->
 
 <template>
@@ -45,6 +46,11 @@
                         :selectedRoomNode="(selectedRoomNode as MovingHeadRoomNode)">
                     </DynamicRoomNodesMovingHeadDetailsPanel>
 
+                    <DynamicRoomNodesProjectorDetailsPanel
+                        v-if="(selectedRoomNode as RoomNodeBase).getRoomNodeType() === RoomNodeType.RNT_PROJECTOR" 
+                        :selectedRoomNode="(selectedRoomNode as ProjectorRoomNode)">
+                    </DynamicRoomNodesProjectorDetailsPanel>
+
                     <DynamicRoomNodesActionSpaceDetailsPanel 
                         v-if="(selectedRoomNode as RoomNodeBase).getRoomNodeType() === RoomNodeType.RNT_ACTIONSPACE" 
                         :selectedRoomNode="(selectedRoomNode as ActionSpaceRoomNode)">
@@ -66,6 +72,7 @@ import { RoomNodeType, fromRoomNodeType } from '~/app/RoomNodes/RoomNodeRegistry
 import  RoomNodeBase from '~/app/RoomNodes/RoomNodeBase';
 import type MovingHeadRoomNode from '~/app/RoomNodes/DMX/MovingHeadRoomNode';
 import type ActionSpaceRoomNode from '~/app/RoomNodes/ActionSpace/ActionSpaceRoomNode';
+import type ProjectorRoomNode from '~/app/RoomNodes/Projector/ProjectorRoomNode';
 
 const props = defineProps({
     selectedRoomNode:{

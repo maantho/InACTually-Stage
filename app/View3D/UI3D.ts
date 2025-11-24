@@ -14,6 +14,7 @@
 	contributors:
 	Fabian Töpfer - baniaf@uber.space
 	Lars Engeln - mail@lars-engeln.de
+	Anton Hörig - dev@antonhoerig.de
 */
 
 import * as THREE from "three";
@@ -24,6 +25,8 @@ import { RoomNodeType } from "../RoomNodes/RoomNodeRegistry";
 
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
+import ProjectorRoomNode from "../RoomNodes/Projector/ProjectorRoomNode";
+import XRHandGestures from "./XRHandGestures";
 
 export default class UI3D {
 
@@ -44,19 +47,27 @@ export default class UI3D {
 	private m_dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.5);
 	private m_template3DObjectContainer = new THREE.Object3D();
 
+	private m_hand0Gestures = {} as XRHandGestures;
+	private m_hand1Gestures = {} as XRHandGestures;
+
+	private m_newXROrigin: THREE.Vector3 | null = null;
+
+
+	private m_xrreferenceSpaceHandle = new THREE.AxesHelper(0.5);
+
 	constructor(canvas: HTMLElement, roomManager: RoomManager) {
 		this.m_canvas = canvas;
 		this.m_roomManager = roomManager;
 		this.m_roomManager.deselectSelectedRoomNode = () => { this.setSelectedRoomNode(undefined) }
-		this.m_xr = this.m_roomManager.stage.getXR()!;
-		this.setup();
+		//this.setup();
 	}
-
+	
 	public getSelectedRoomNode() {
 		return this.selectedRoomNode;
 	}
-
+	
 	public setup() {
+		this.m_xr = this.m_roomManager.stage.getXR()!;
 		this.setupListeners()
 
 		this.orbitControls = new OrbitControls(this.m_roomManager.stage.getCamera().value, this.m_roomManager.stage.getDOMElement());
@@ -86,6 +97,8 @@ export default class UI3D {
 		this.m_roomManager.stage.getScene().add(this.m_transformControls);
 		this.m_roomManager.stage.getScene().add(this.m_template3DObjectContainer);
 		this.m_template3DObjectContainer.position.set(0, -100, 0);
+
+		this.m_roomManager.stage.getScene().add(this.m_xrreferenceSpaceHandle);
 
 		this.setupControls();
 	}
@@ -312,15 +325,34 @@ export default class UI3D {
 		return pos;
 	}
 
-
-
-
 	private setupControls() {
 		let leftControlRay = this.createControlRay(0);
 		let rightControlRay = this.createControlRay(1);
 
-		let leftHand = this.createHand(0);
-		let rightHand = this.createHand(1);
+		let hand0 = this.createHand(0);
+		let hand1 = this.createHand(1);
+		this.m_hand0Gestures = new XRHandGestures(hand0);
+		this.m_hand1Gestures = new XRHandGestures(hand1);
+		
+		/*
+		let material = new THREE.MeshStandardMaterial({ color: 0x0077ff });
+
+		let geometry = new THREE.SphereGeometry(0.01, 32, 32); // radius, widthSegments, heightSegments
+		let sphere0 = new THREE.Mesh(geometry, material);
+		this.m_roomManager.stage.getScene().add(sphere0);
+
+		geometry = new THREE.SphereGeometry(0.025, 32, 32);
+		let sphere1 = new THREE.Mesh(geometry, material);
+		this.m_roomManager.stage.getScene().add(sphere1);
+
+		this.m_hand0Gestures.addDebugMeshes(sphere0, sphere1, material);
+		*/
+		
+		this.m_hand0Gestures.activateCloseGesture(this.handClosed.bind(this),() => {}, () => {});
+		this.m_hand1Gestures.activateCloseGesture(this.handClosed.bind(this), () => {}, () => {});
+
+		this.m_hand0Gestures.activatePinchGesture(this.handPinched.bind(this), this.handPinchHeld.bind(this), this.handPinchReleased.bind(this));
+		this.m_hand1Gestures.activatePinchGesture(this.handPinched.bind(this), this.handPinchHeld.bind(this), this.handPinchReleased.bind(this));
 
 		let leftController = this.createController(0);
 		let rightController = this.createController(1);
@@ -340,7 +372,9 @@ export default class UI3D {
 	private createHand(index: number): THREE.XRHandSpace {
 		const handModelFactory = new XRHandModelFactory();
 		let hand = this.m_xr.getHand(index);
-		hand.add(handModelFactory.createHandModel(hand, "mesh"));
+
+		//Add debug geometry
+		//hand.add(handModelFactory.createHandModel(hand, "mesh"));
 
 		this.m_roomManager.stage.getScene().add(hand);
 		return hand;
@@ -352,6 +386,84 @@ export default class UI3D {
 
 		this.m_roomManager.stage.getScene().add(controllerGrip);
 		return controllerGrip;
+	}
+
+	public update(){
+		this.m_hand0Gestures.update();
+		this.m_hand1Gestures.update();
+	}
+
+	private handClosed(position: THREE.Vector3, orientation: THREE.Quaternion){
+		const projectorManager = this.m_roomManager.getRoomNodeMgrByRoomNodeType(RoomNodeType.RNT_PROJECTOR)
+		if (projectorManager) {
+			for (const projector of projectorManager.getRoomNodes()) {
+				if (projector instanceof ProjectorRoomNode){
+					if(projector.getIsCalibrating()){
+						projector.publishObjectPoint({x: position.x, y: position.y, z: position.z})
+						let material = new THREE.MeshStandardMaterial({ color: 0x0077ff });
+						let geometry = new THREE.SphereGeometry(0.025, 32, 32); // radius, widthSegments, heightSegments
+						let sphere = new THREE.Mesh(geometry, material);
+						sphere.position.set(position.x, position.y, position.z);
+						this.m_roomManager.stage.getScene().add(sphere);
+					}
+				}
+			}
+		}
+	}
+
+	private handPinched(position: THREE.Vector3, orientation: THREE.Quaternion){
+		if (!this.m_newXROrigin) {
+			this.m_newXROrigin = position; // set origin
+			this.m_xrreferenceSpaceHandle.position.copy(position);
+		}
+	}
+
+	private handPinchHeld(position: THREE.Vector3, orientation: THREE.Quaternion){
+		if (this.m_newXROrigin)  { //use exsiting origin and new position as foreward
+			const z = this.m_newXROrigin.clone().sub(position);
+			z.y = 0; //z projected on ground
+			z.normalize()
+			const y = new THREE.Vector3(0, 1, 0);
+			const x = y.clone().cross(z).normalize();
+			
+			const rotMatrix = new THREE.Matrix4();
+			rotMatrix.makeBasis(x, y, z); 
+			
+			const quat = new THREE.Quaternion().setFromRotationMatrix(rotMatrix);
+
+			this.m_xrreferenceSpaceHandle.quaternion.copy(quat);
+		}
+	}
+
+	private handPinchReleased(position: THREE.Vector3, orientation: THREE.Quaternion){
+		this.handPinchHeld;
+		if (this.m_newXROrigin)  { 
+
+			this.applyReferenceSpaceTransform();
+
+			this.m_newXROrigin = null; //next one is origin again
+		}
+	}
+
+
+	private applyReferenceSpaceTransform(){
+		const baseRefSpace = this.m_xr.getReferenceSpace();
+		if (!baseRefSpace) 
+			return;
+		
+		let worldPos = this.m_xrreferenceSpaceHandle.getWorldPosition(new THREE.Vector3());
+		let worldQuat = this.m_xrreferenceSpaceHandle.getWorldQuaternion(new THREE.Quaternion());
+		
+		const transform = new XRRigidTransform(
+		  { x: worldPos.x, y: worldPos.y, z: worldPos.z },
+		  { x: worldQuat.x, y: worldQuat.y, z: worldQuat.z, w: worldQuat.w }
+		);
+		
+		const offsetSpace = baseRefSpace.getOffsetReferenceSpace(transform);
+		this.m_xr.setReferenceSpace(offsetSpace);
+
+		this.m_xrreferenceSpaceHandle.position.set(0, 0,0 );
+		this.m_xrreferenceSpaceHandle.setRotationFromQuaternion(new THREE.Quaternion());
 	}
 
 }
